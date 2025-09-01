@@ -15,9 +15,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh 'docker build -t sapna350/springboot-hello:latest .'
-                }
+                sh 'docker build -t sapna350/springboot-hello:latest .'
             }
         }
 
@@ -32,10 +30,11 @@ pipeline {
 
         stage('Configure AWS & kubectl') {
             steps {
-                script {
-                    sh "aws configure set aws_access_key_id $AWS_CREDENTIALS_USR"
-                    sh "aws configure set aws_secret_access_key $AWS_CREDENTIALS_PSW"
-                    sh "aws eks --region ap-south-1 update-kubeconfig --name your-eks-cluster"
+                withEnv(["AWS_ACCESS_KEY_ID=${AWS_CREDENTIALS_USR}", "AWS_SECRET_ACCESS_KEY=${AWS_CREDENTIALS_PSW}"]) {
+                    sh 'aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID'
+                    sh 'aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY'
+                    sh 'aws configure set default.region ap-south-1'
+                    sh 'aws eks --region ap-south-1 update-kubeconfig --name your-eks-cluster'
                 }
             }
         }
