@@ -2,20 +2,11 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "sapna350/springboot-hello:latest"
-        DOCKERHUB_CREDENTIALS = "dockerhub-creds"   
-        KUBE_CONFIG = "$WORKSPACE/kubeconfig"     
-        NAMESPACE = "sapna-namespace"              
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials')
+        AWS_CREDENTIALS = credentials('aws-credentials')
     }
 
     stages {
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/Sapna35/Docker-task'
-            }
-        }
-
         stage('Build with Maven') {
             steps {
                 sh 'mvn clean package -DskipTests'
@@ -23,46 +14,36 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-    steps {
-        script {
-            sh 'docker build -t sapna350/springboot-hello:latest -f springboot-app/Dockerfile springboot-app'
+            steps {
+                script {
+                    sh 'docker build -t sapna350/springboot-hello:latest .'
+                }
+            }
         }
-    }
-}
 
         stage('Push to DockerHub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKERHUB_CREDENTIALS}") {
-                        docker.image("${DOCKER_IMAGE}").push()
-                    }
+                    sh "echo $DOCKER_HUB_CREDENTIALS_PSW | docker login -u $DOCKER_HUB_CREDENTIALS_USR --password-stdin"
+                    sh 'docker push sapna350/springboot-hello:latest'
                 }
             }
         }
 
         stage('Configure AWS & kubectl') {
             steps {
-                withCredentials([aws(credentialsId: "${AWS_CREDENTIALS}", region: 'us-east-1')]) {
-                    sh '''
-                        # Update kubeconfig for EKS
-                        aws eks update-kubeconfig --name my-eks-cluster --region us-east-1 --kubeconfig ${KUBE_CONFIG}
-                        export KUBECONFIG=${KUBE_CONFIG}
-                    '''
+                script {
+                    sh "aws configure set aws_access_key_id $AWS_CREDENTIALS_USR"
+                    sh "aws configure set aws_secret_access_key $AWS_CREDENTIALS_PSW"
+                    sh "aws eks --region ap-south-1 update-kubeconfig --name your-eks-cluster"
                 }
             }
         }
 
         stage('Deploy to EKS') {
             steps {
-                sh '''
-                    export KUBECONFIG=${KUBE_CONFIG}
-                    kubectl config use-context arn:aws:eks:us-east-1:123456789012:cluster/my-eks-cluster
-                    kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                    
-                    # Apply Kubernetes manifests (deployment + service)
-                    kubectl apply -f k8s/deployment.yaml -n ${NAMESPACE}
-                    kubectl apply -f k8s/service.yaml -n ${NAMESPACE}
-                '''
+                sh 'kubectl apply -f k8s/deployment.yaml -n your-namespace'
+                sh 'kubectl apply -f k8s/service.yaml -n your-namespace'
             }
         }
     }
