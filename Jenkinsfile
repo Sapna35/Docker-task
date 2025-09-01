@@ -23,12 +23,12 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-            steps {
-                script {
-                    docker.build("${DOCKER_IMAGE}")
-                }
-            }
+    steps {
+        script {
+            sh 'docker build -t sapna350/springboot-hello:latest -f springboot-app/Dockerfile springboot-app'
         }
+    }
+}
 
         stage('Push to DockerHub') {
             steps {
